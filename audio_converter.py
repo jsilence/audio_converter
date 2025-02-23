@@ -24,8 +24,8 @@ def has_identical_channels(file_path: Path) -> bool:
     ]
     
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        audio_info = json.loads(result.stdout)
+        result = subprocess.run(cmd, capture_output=True, text=False)
+        audio_info = json.loads(result.stdout.decode('utf-8'))
         channels = int(audio_info['streams'][0]['channels'])
         
         if channels != 2:  # If not stereo, return False
@@ -40,7 +40,7 @@ def has_identical_channels(file_path: Path) -> bool:
             '-'
         ]
         
-        result = subprocess.run(check_cmd, capture_output=True, text=False)
+        result = subprocess.run(check_cmd, capture_output=True, text=False, encoding=None)
         stderr = result.stderr.decode('latin-1', errors='ignore') if result.stderr else ''
         # If channels are different, ffmpeg will output warnings
         return 'difference' not in stderr.lower()
