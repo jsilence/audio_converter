@@ -14,6 +14,7 @@ console = Console()
 
 def has_identical_channels(file_path: Path) -> bool:
     """Check if stereo audio file has identical channels"""
+    # First check number of channels
     cmd = [
         'ffprobe',
         '-i', str(file_path),
@@ -31,21 +32,34 @@ def has_identical_channels(file_path: Path) -> bool:
         if channels != 2:  # If not stereo, return False
             return False
             
-        # Now check if channels are identical using ffmpeg
+        # For stereo files, compare channels using ffmpeg stats
         check_cmd = [
             'ffmpeg',
             '-i', str(file_path),
-            '-af', 'channelcompare',  # Compare channels
+            '-map', '0:a:0',  # Select first audio stream
+            '-filter:a', 'astats=measure_perchannel=1:measure_overall=0',  # Get per-channel stats
             '-f', 'null',
             '-'
         ]
         
-        result = subprocess.run(check_cmd, capture_output=True, text=False, encoding=None)
-        stderr = result.stderr.decode('latin-1', errors='ignore') if result.stderr else ''
-        # If channels are different, ffmpeg will output warnings
-        return 'difference' not in stderr.lower()
+        result = subprocess.run(check_cmd, capture_output=True, text=False)
+        # Use latin-1 encoding which can handle all byte values
+        stderr = result.stderr.decode('latin-1', errors='replace')
         
-    except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError):
+        # Look for DC offset and RMS values in both channels
+        # If they're very close, channels are likely identical
+        import re
+        dc_offsets = re.findall(r'DC offset: ([0-9.-]+)', stderr)
+        rms_levels = re.findall(r'RMS level: ([0-9.-]+)', stderr)
+        
+        if len(dc_offsets) >= 2 and len(rms_levels) >= 2:
+            dc_diff = abs(float(dc_offsets[0]) - float(dc_offsets[1]))
+            rms_diff = abs(float(rms_levels[0]) - float(rms_levels[1]))
+            return dc_diff < 0.0001 and rms_diff < 0.0001
+            
+        return False
+        
+    except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError, ValueError, IndexError):
         return False
 
 def convert_audio(source_file: Path, target_file: Path, sample_rate: int, bit_depth: int):
