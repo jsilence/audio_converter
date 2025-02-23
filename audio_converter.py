@@ -40,7 +40,7 @@ def has_identical_channels(file_path: Path) -> bool:
             '-'
         ]
         
-        result = subprocess.run(check_cmd, capture_output=True, text=True)
+        result = subprocess.run(check_cmd, capture_output=True, text=True, encoding='latin-1', errors='ignore')
         # If channels are different, ffmpeg will output warnings
         return 'difference' not in result.stderr.lower()
         
@@ -70,7 +70,7 @@ def convert_audio(source_file: Path, target_file: Path, sample_rate: int, bit_de
     cmd.append(str(target_file))
     
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        subprocess.run(cmd, check=True, capture_output=True, text=True, encoding='latin-1', errors='ignore')
     except subprocess.CalledProcessError as e:
         print(f"Error converting {source_file}: {e.stderr}")
         return False
