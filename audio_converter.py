@@ -40,9 +40,10 @@ def has_identical_channels(file_path: Path) -> bool:
             '-'
         ]
         
-        result = subprocess.run(check_cmd, capture_output=True, text=True, encoding='latin-1', errors='ignore')
+        result = subprocess.run(check_cmd, capture_output=True, text=False)
+        stderr = result.stderr.decode('latin-1', errors='ignore') if result.stderr else ''
         # If channels are different, ffmpeg will output warnings
-        return 'difference' not in result.stderr.lower()
+        return 'difference' not in stderr.lower()
         
     except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError):
         return False
@@ -70,7 +71,9 @@ def convert_audio(source_file: Path, target_file: Path, sample_rate: int, bit_de
     cmd.append(str(target_file))
     
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True, encoding='latin-1', errors='ignore')
+        result = subprocess.run(cmd, check=True, capture_output=True, text=False)
+        if result.stderr:
+            print(f"ffmpeg output: {result.stderr.decode('latin-1', errors='ignore')}")
     except subprocess.CalledProcessError as e:
         print(f"Error converting {source_file}: {e.stderr}")
         return False
