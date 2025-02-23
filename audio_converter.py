@@ -3,20 +3,65 @@
 import os
 import argparse
 import subprocess
+import json
 from pathlib import Path
+
+def has_identical_channels(file_path: Path) -> bool:
+    """Check if stereo audio file has identical channels"""
+    cmd = [
+        'ffprobe',
+        '-i', str(file_path),
+        '-select_streams', 'a:0',
+        '-show_entries', 'stream=channels',
+        '-v', 'quiet',
+        '-of', 'json'
+    ]
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        audio_info = json.loads(result.stdout)
+        channels = int(audio_info['streams'][0]['channels'])
+        
+        if channels != 2:  # If not stereo, return False
+            return False
+            
+        # Now check if channels are identical using ffmpeg
+        check_cmd = [
+            'ffmpeg',
+            '-i', str(file_path),
+            '-af', 'channelcompare',  # Compare channels
+            '-f', 'null',
+            '-'
+        ]
+        
+        result = subprocess.run(check_cmd, capture_output=True, text=True)
+        # If channels are different, ffmpeg will output warnings
+        return 'difference' not in result.stderr.lower()
+        
+    except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError):
+        return False
 
 def convert_audio(source_file: Path, target_file: Path, sample_rate: int, bit_depth: int):
     """Convert audio file using ffmpeg with specified parameters"""
     target_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Check if we should convert to mono
+    should_mono = has_identical_channels(source_file)
     
     cmd = [
         'ffmpeg', '-y',  # -y to overwrite output files
         '-i', str(source_file),
         '-acodec', 'pcm_s16le',  # Force 16-bit output
         '-ar', str(sample_rate),  # Sample rate
-        '-sample_fmt', f's{bit_depth}',  # Bit depth
-        str(target_file)
+        '-sample_fmt', f's{bit_depth}'  # Bit depth
     ]
+    
+    # Add mono conversion if needed
+    if should_mono:
+        cmd.extend(['-ac', '1'])
+        print(f"Converting to mono as channels are identical")
+    
+    cmd.append(str(target_file))
     
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
