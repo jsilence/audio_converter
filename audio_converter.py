@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 
 import os
-import argparse
 import subprocess
 import json
 from pathlib import Path
+import typer
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich import print as rprint
+
+# Initialize rich console
+console = Console()
 
 def has_identical_channels(file_path: Path) -> bool:
     """Check if stereo audio file has identical channels"""
@@ -74,8 +80,25 @@ def process_directory(source_dir: Path, target_dir: Path, sample_rate: int, bit_
     """Recursively process all wav and aiff files in source directory"""
     audio_extensions = {'.wav', '.aiff', '.aif'}
     
-    for source_file in source_dir.rglob('*'):
-        if source_file.suffix.lower() in audio_extensions:
+    # Get list of files first
+    audio_files = [f for f in source_dir.rglob('*') if f.suffix.lower() in audio_extensions]
+    
+    if not audio_files:
+        console.print("[yellow]No audio files found in the source directory.[/yellow]")
+        return
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console
+    ) as progress:
+        task = progress.add_task("[cyan]Converting audio files...", total=len(audio_files))
+        
+        for source_file in audio_files:
+            progress.update(task, description=f"[cyan]Converting: {source_file.name}")
+            
             # Create corresponding target path
             relative_path = source_file.relative_to(source_dir)
             target_file = target_dir / relative_path
@@ -83,36 +106,35 @@ def process_directory(source_dir: Path, target_dir: Path, sample_rate: int, bit_
             # Ensure target directory exists
             target_file.parent.mkdir(parents=True, exist_ok=True)
             
-            print(f"Converting: {source_file}")
             if convert_audio(source_file, target_file, sample_rate, bit_depth):
-                print(f"Successfully converted to: {target_file}")
+                console.print(f"[green]✓[/green] Converted: {source_file.name}")
             else:
-                print(f"Failed to convert: {source_file}")
+                console.print(f"[red]✗[/red] Failed to convert: {source_file.name}")
+            
+            progress.advance(task)
 
-def main():
-    parser = argparse.ArgumentParser(description='Convert audio files to specified format')
-    parser.add_argument('source_dir', help='Source directory containing audio files')
-    parser.add_argument('target_dir', help='Target directory for converted files')
-    parser.add_argument('--sample-rate', type=int, default=44100,
-                        help='Sample rate in Hz (default: 44100)')
-    parser.add_argument('--bit-depth', type=int, default=16,
-                        help='Bit depth (default: 16)')
+def main(
+    source_dir: Path = typer.Argument(..., help="Source directory containing audio files", exists=True, dir_okay=True, file_okay=False),
+    target_dir: Path = typer.Argument(..., help="Target directory for converted files"),
+    sample_rate: int = typer.Option(44100, "--sample-rate", "-sr", help="Sample rate in Hz"),
+    bit_depth: int = typer.Option(16, "--bit-depth", "-bd", help="Bit depth"),
+):
+    """
+    Convert audio files to specified format while maintaining directory structure.
+    Supports WAV and AIFF files. Automatically converts identical stereo channels to mono.
+    """
+    source_path = source_dir.resolve()
+    target_path = target_dir.resolve()
     
-    args = parser.parse_args()
+    console.print("\n[bold cyan]Audio Converter[/bold cyan]")
+    console.print(f"[white]Source directory:[/white] [yellow]{source_path}[/yellow]")
+    console.print(f"[white]Target directory:[/white] [yellow]{target_path}[/yellow]")
+    console.print(f"[white]Sample rate:[/white] [green]{sample_rate}[/green] Hz")
+    console.print(f"[white]Bit depth:[/white] [green]{bit_depth}[/green] bit\n")
     
-    source_path = Path(args.source_dir).resolve()
-    target_path = Path(args.target_dir).resolve()
+    process_directory(source_path, target_path, sample_rate, bit_depth)
     
-    if not source_path.exists():
-        print(f"Error: Source directory '{source_path}' does not exist")
-        return
-    
-    print(f"Processing files from: {source_path}")
-    print(f"Saving converted files to: {target_path}")
-    print(f"Sample rate: {args.sample_rate} Hz")
-    print(f"Bit depth: {args.bit_depth} bit")
-    
-    process_directory(source_path, target_path, args.sample_rate, args.bit_depth)
+    console.print("\n[bold green]Conversion complete![/bold green]")
 
 if __name__ == "__main__":
-    main()
+    typer.run(main)
