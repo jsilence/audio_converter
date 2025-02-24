@@ -26,7 +26,13 @@ A command-line tool for batch converting audio files while maintaining directory
 brew install ffmpeg  # macOS
 ```
 
-2. Install Python dependencies:
+2. Install and run with uv (recommended):
+```bash
+pip install uv
+uv pip install --script audio_converter.py
+```
+
+Alternatively, install dependencies manually:
 ```bash
 pip install typer rich
 ```
