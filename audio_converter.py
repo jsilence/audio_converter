@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# deps:
+#   typer>=0.9.0
+#   rich>=13.7.0
+
 import os
 import subprocess
 import json
