@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
-# deps:
-#   typer>=0.9.0
-#   rich>=13.7.0
+# /// script
+# dependencies = [
+#   "typer",
+#   "rich",
+# ]
+# ///
 
 import os
 import subprocess
