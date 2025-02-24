@@ -99,4 +99,4 @@ Real-time progress bar shows:
 
 ## License
 
-MIT License
+Creative Commons Zero v1.0 Universal
